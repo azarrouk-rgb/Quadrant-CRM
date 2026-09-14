@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quadrant</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Source+Sans+3:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="loginRoot"></div>
+
+<div class="wrap" id="appRoot" hidden>
+  <header class="topbar">
+    <div class="brand">
+      <svg width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M4 6H26L18 16.5V24L12 21.5V16.5L4 6Z" fill="var(--accent)"/>
+      </svg>
+      <div>
+        <div class="brand-name">Quadrant</div>
+        <div class="brand-sub">Client accounts &amp; leads</div>
+      </div>
+    </div>
+    <div class="identity" id="identityBox"></div>
+  </header>
+
+  <div id="apiBanner" hidden class="banner">
+    <span>⚠</span>
+    <span id="apiBannerText">Can't reach the server right now. Changes won't be saved until it's back.</span>
+  </div>
+
+  <main id="app"></main>
+</div>
+
+<div id="modalRoot"></div>
+<div id="drawerRoot"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
