@@ -79,7 +79,16 @@
     openLeadNotes: []
   };
   var drawerDraft = null;
-  var usersModalState = { resetForId: null };
+  var usersModalState = { resetForId: null, lastEmailNote: null };
+
+  function emailStatusNote(emailResult, user){
+    if (!emailResult) return null;
+    var who = (user && user.name) ? escapeHtml(user.name) : "They";
+    if (emailResult.sent) return { ok: true, text: who + "'ll get an email with their login." };
+    if (emailResult.reason === "no_recipient") return null; // no email was given — nothing to report
+    if (emailResult.reason === "not_configured") return { ok: false, text: "Account saved, but Quadrant isn't set up to send email yet — share the password yourself." };
+    return { ok: false, text: "Account saved, but the email couldn't be sent — share the password yourself." };
+  }
   var timers = {};
 
   /* =================== Helpers =================== */
@@ -554,12 +563,15 @@
 
     var html = '<div class="overlay" id="usersOverlay"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="usersTitle">';
     html += '<h3 id="usersTitle">Team &amp; access</h3><div class="modal-sub">Everyone who can sign in to Quadrant.</div>';
+    if (usersModalState.lastEmailNote){
+      html += '<div class="form-'+(usersModalState.lastEmailNote.ok?'success':'error')+'" style="margin:10px 0">'+usersModalState.lastEmailNote.text+'</div>';
+    }
 
     state.users.forEach(function(u, i){
       var c = userColor(i);
       html += '<div class="user-row" data-user-id="'+u.id+'">';
       html += '<span class="avatar avatar-md" style="background:'+c.bg+';color:'+c.ink+'">'+escapeHtml(initials(u.name))+'</span>';
-      html += '<div><div class="user-row-name">'+escapeHtml(u.name)+'</div><div class="user-row-username">@'+escapeHtml(u.username)+'</div></div>';
+      html += '<div><div class="user-row-name">'+escapeHtml(u.name)+'</div><div class="user-row-username">@'+escapeHtml(u.username)+(u.email?' &middot; '+escapeHtml(u.email):'')+'</div></div>';
       html += '<div class="user-row-actions">';
       html += '<span class="role-badge '+(u.role==="admin"?"admin":"rep")+'">'+(u.role==="admin"?"Admin":"Rep")+'</span>';
       if (!u.active) html += '<span class="role-badge inactive">Inactive</span>';
@@ -575,14 +587,19 @@
           '<button class="btn btn-primary" data-action="saveReset" style="flex:none">Save</button>'+
           '<button class="btn btn-ghost" data-action="cancelReset" style="flex:none">Cancel</button>'+
           '</div>';
+        if (!u.email){
+          html += '<div class="modal-sub" style="margin:-4px 0 4px">No email on file for '+escapeHtml(u.name)+' — you\'ll need to share the new password yourself.</div>';
+        }
       }
     });
 
     html += '<div class="section-title" style="margin-top:18px">Add someone</div>';
+    html += '<div class="modal-sub" style="margin-top:-6px">Add an email to have Quadrant send them their login automatically.</div>';
     html += '<div id="addUserError"></div>';
     html += '<div class="field"><label for="nu_name">Name</label><input id="nu_name" type="text"></div>';
     html += '<div class="field-row"><div class="field"><label for="nu_username">Username</label><input id="nu_username" type="text" placeholder="e.g. jsmith"></div>'+
       '<div class="field"><label for="nu_role">Role</label><select id="nu_role"><option value="rep">Rep</option><option value="admin">Admin</option></select></div></div>';
+    html += '<div class="field"><label for="nu_email">Email (optional)</label><input id="nu_email" type="email" placeholder="jane@company.com"></div>';
     html += '<div class="field"><label for="nu_password">Temporary password</label><input id="nu_password" type="text" placeholder="At least 8 characters"></div>';
     html += '<button class="btn btn-primary btn-block" id="addUserBtn">Add user</button>';
 
@@ -590,8 +607,8 @@
     html += '</div></div>';
     root.innerHTML = html;
 
-    document.getElementById("closeUsersBtn").addEventListener("click", function(){ root.innerHTML=""; usersModalState.opened=false; });
-    document.getElementById("usersOverlay").addEventListener("click", function(e){ if (e.target.id==="usersOverlay"){ root.innerHTML=""; usersModalState.opened=false; } });
+    document.getElementById("closeUsersBtn").addEventListener("click", function(){ root.innerHTML=""; usersModalState.opened=false; usersModalState.lastEmailNote=null; });
+    document.getElementById("usersOverlay").addEventListener("click", function(e){ if (e.target.id==="usersOverlay"){ root.innerHTML=""; usersModalState.opened=false; usersModalState.lastEmailNote=null; } });
 
     document.querySelectorAll("[data-action='toggleRole']").forEach(function(btn){
       btn.addEventListener("click", function(){
@@ -630,7 +647,11 @@
         var pw = document.getElementById("resetPw_"+id).value;
         if (!pw || pw.length < 8){ alert("Password must be at least 8 characters."); return; }
         api("/api/users/"+id, { method:"PATCH", body: JSON.stringify({ password: pw }) })
-          .then(function(){ usersModalState.resetForId = null; renderUsersModal(); })
+          .then(function(body){
+            usersModalState.resetForId = null;
+            usersModalState.lastEmailNote = emailStatusNote(body && body.email, body && body.user);
+            renderUsersModal();
+          })
           .catch(function(err){ alert(err.message); });
       });
     });
@@ -638,6 +659,7 @@
       var name = document.getElementById("nu_name").value.trim();
       var username = document.getElementById("nu_username").value.trim();
       var role = document.getElementById("nu_role").value;
+      var email = document.getElementById("nu_email").value.trim();
       var password = document.getElementById("nu_password").value;
       var errBox = document.getElementById("addUserError");
       errBox.innerHTML = "";
@@ -645,8 +667,11 @@
         errBox.innerHTML = '<div class="form-error">Name, username and password are all required.</div>';
         return;
       }
-      api("/api/users", { method:"POST", body: JSON.stringify({ name:name, username:username, password:password, role:role }) })
-        .then(function(){ return refreshUsers(); })
+      api("/api/users", { method:"POST", body: JSON.stringify({ name:name, username:username, password:password, role:role, email:email }) })
+        .then(function(body){
+          usersModalState.lastEmailNote = emailStatusNote(body && body.email, body && body.user);
+          return refreshUsers();
+        })
         .then(function(){ renderUsersModal(); renderApp(); })
         .catch(function(err){ errBox.innerHTML = '<div class="form-error">'+escapeHtml(err.message)+'</div>'; });
     });

@@ -54,6 +54,51 @@ for that yet for your own account beyond an admin resetting anyone's
 password from the Team & access panel — resetting your own works the same
 way).
 
+## Welcome emails
+
+When an admin adds a new person (or gives their email address) and resets
+their password, Quadrant can email them their username and password
+automatically, so you don't have to relay it yourself. This is optional —
+leave it unset and everything still works, you'll just share the password
+another way.
+
+To turn it on, set these in `.env` (see the commented block in
+`.env.example`):
+
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` — your
+  outgoing mail server's settings.
+- `SMTP_FROM` — optional, what recipients see as the sender (defaults to
+  `SMTP_USER`).
+- `APP_URL` — optional, your app's web address, included as a link in the
+  email.
+
+Where to get these:
+
+- **Gmail**: turn on 2-Step Verification on the sending account, then create
+  an "app password" at <https://myaccount.google.com/apppasswords> — use
+  that as `SMTP_PASS` (not the regular account password). Use
+  `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587`, `SMTP_SECURE=false`.
+- **Office 365 / Outlook**: `SMTP_HOST=smtp.office365.com`, `SMTP_PORT=587`,
+  `SMTP_SECURE=false`, and your normal mailbox username/password (or an app
+  password, if your organization requires one).
+- **A company mail server**: ask whoever manages it for the host and port,
+  and whether it needs SSL (`SMTP_PORT=465`, `SMTP_SECURE=true`) or STARTTLS
+  (`SMTP_PORT=587`, `SMTP_SECURE=false`).
+
+A few notes:
+
+- The email includes the person's plain-text password, so only send it to
+  an address you trust belongs to that person.
+- If sending fails (bad credentials, network hiccup, or SMTP just isn't
+  configured), the account is still created/updated — Quadrant tells the
+  admin in the Team & access panel that they'll need to share the password
+  another way, rather than failing the whole request.
+- Someone added without an email address never gets an email — you'll need
+  to share their login with them directly.
+- Remember to add these same `SMTP_*`/`APP_URL` variables to your hosting
+  provider's environment settings too (see "Deploying it somewhere your
+  team can reach" below) — they only take effect where they're set.
+
 ## Roles
 
 - **Rep** — full use of the CRM: add and edit leads, manage contacts, log

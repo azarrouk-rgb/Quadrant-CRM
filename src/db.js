@@ -19,6 +19,7 @@ db.exec(`
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     username TEXT NOT NULL UNIQUE,
+    email TEXT DEFAULT '',
     password_hash TEXT NOT NULL,
     role TEXT NOT NULL CHECK (role IN ('admin','rep')),
     active INTEGER NOT NULL DEFAULT 1,
@@ -65,17 +66,27 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_notes_lead ON notes(lead_id);
 `);
 
+// Migration: databases created before the "email" column existed need it added
+// in place, without touching any existing rows.
+const userColumns = db.prepare("PRAGMA table_info(users)").all().map((c) => c.name);
+if (!userColumns.includes("email")) {
+  db.exec("ALTER TABLE users ADD COLUMN email TEXT DEFAULT ''");
+  // eslint-disable-next-line no-console
+  console.log("Migrated: added users.email column.");
+}
+
 // Bootstrap the first admin account so there's a way to log in at all.
 const userCount = db.prepare("SELECT COUNT(*) AS n FROM users").get().n;
 if (userCount === 0) {
   const name = process.env.ADMIN_NAME || "Admin";
   const username = (process.env.ADMIN_USERNAME || "admin").trim().toLowerCase();
+  const email = process.env.ADMIN_EMAIL || "";
   const password = process.env.ADMIN_PASSWORD || "change-this-password";
   const hash = bcrypt.hashSync(password, 12);
   db.prepare(
-    `INSERT INTO users (id, name, username, password_hash, role, active, created_at)
-     VALUES (?, ?, ?, ?, 'admin', 1, ?)`
-  ).run(uuid(), name, username, hash, new Date().toISOString());
+    `INSERT INTO users (id, name, username, email, password_hash, role, active, created_at)
+     VALUES (?, ?, ?, ?, ?, 'admin', 1, ?)`
+  ).run(uuid(), name, username, email, hash, new Date().toISOString());
   // eslint-disable-next-line no-console
   console.log(
     `\nCreated first admin account:\n  username: ${username}\n  password: ${password === "change-this-password" ? "(the ADMIN_PASSWORD you set in .env)" : "(the one you set in .env)"}\n  Please log in and consider changing the password.\n`
